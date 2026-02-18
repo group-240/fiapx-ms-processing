@@ -38,5 +38,4 @@ jobs:
         run: terraform plan -var="bucket_name=${{ secrets.TF_BUCKET_NAME }}"
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve -var="bucket_name=${{ secrets.TF_BUCKET_NAME }}"
