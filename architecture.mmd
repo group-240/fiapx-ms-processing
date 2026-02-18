@@ -1,0 +1,38 @@
+graph TD
+    subgraph Presentation
+        VC[VideoController]
+    end
+
+    subgraph Use_Cases
+        PVUC[ProcessVideoUseCase]
+    end
+
+    subgraph Domain
+        VE[Video Entity]
+        VPG[VideoProcessorGateway]
+        SG[StorageGateway]
+        NG[NotificationGateway]
+    end
+
+    subgraph Infrastructure
+        FFVP[FFmpegVideoProcessor - JavaCV]
+        S3SA[S3StorageAdapter - AWS S3]
+        LSA[LocalStorageAdapter - Local Disk]
+        HNA[HttpNotificationAdapter - WebClient]
+    end
+
+    VC --> PVUC
+    PVUC --> VE
+    PVUC --> VPG
+    PVUC --> SG
+    PVUC --> NG
+
+    VPG -.-> FFVP
+    SG -.-> S3SA
+    SG -.-> LSA
+    NG -.-> HNA
+
+    style Domain fill:#f9f,stroke:#333,stroke-width:4px
+    style Use_Cases fill:#bbf,stroke:#333,stroke-width:2px
+    style Infrastructure fill:#dfd,stroke:#333,stroke-width:2px
+    style Presentation fill:#ffd,stroke:#333,stroke-width:2px
