@@ -3,8 +3,9 @@ package com.fiap.fiapx.infrastructure.adapter.notification;
 import com.fiap.fiapx.domain.repositories.EmailGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
-// import org.springframework.mail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -13,11 +14,14 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class EmailNotificationAdapter implements EmailGateway {
 
-    // private final JavaMailSender mailSender;
+    private final JavaMailSender mailSender;
+
+    @Value("${mail.from}")
+    private String from;
 
     @Override
     public void sendErrorEmail(String to, Integer videoId) {
-/*        if (!StringUtils.hasText(to)) {
+        if (!StringUtils.hasText(to)) {
             log.warn("E-mail de destino não informado. videoId={}", videoId);
             return;
         }
@@ -27,7 +31,7 @@ public class EmailNotificationAdapter implements EmailGateway {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
-            message.setFrom("no-reply@fiapx.com"); // 🔴 ajuste via application.yml se possível
+            message.setFrom(from);
             message.setSubject("Erro ao processar o vídeo " + videoId);
             message.setText(
                     String.format(
@@ -43,6 +47,6 @@ public class EmailNotificationAdapter implements EmailGateway {
         } catch (Exception e) {
             // ✅ loga stacktrace completo
             log.error("Falha ao enviar e-mail para {}. videoId={}", to, videoId, e);
-        }*/
+        }
     }
 }

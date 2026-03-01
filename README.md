@@ -97,6 +97,15 @@ Em caso de falha, um e-mail será enviado ao usuário:
 - **Assunto:** Erro ao processar o video {videoId}
 - **Corpo:** Seu video foi interrompido por algum erro
 
+### 4. Download de Frames (ZIP)
+Baixa todos os frames processados de uma transação específica.
+
+**Endpoint:** `GET /api/capturas/download/{idTransacao}`  
+**Exemplo cURL:**
+```bash
+curl -X GET "http://localhost:8080/api/capturas/download/1" --output frames.zip
+```
+
 ---
 
 ## ⚙️ Configuração (application.properties)

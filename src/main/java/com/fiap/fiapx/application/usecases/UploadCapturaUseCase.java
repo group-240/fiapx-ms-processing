@@ -27,7 +27,7 @@ public class UploadCapturaUseCase {
     public void execute(Captura captura) {
         Integer idTransacao = captura.getId();
         File tempVideoFile = null;
-        
+
         try {
             log.info("Iniciando processamento para a transacao: {} ({})", idTransacao, captura.getEmail());
             
@@ -46,7 +46,7 @@ public class UploadCapturaUseCase {
             // 4. Salvar frames
             for (int i = 0; i < frames.size(); i++) {
                 File frame = frames.get(i);
-                String path = "user_" + idTransacao + "/" + captura.getFileName() + "/frame_" + (i * 10) + "s.jpg";
+                String path = "transacao_" + idTransacao + "/frame_" + (i * secundSplitter) + "s.jpg";
                 repository.upload(frame, path);
                 Files.deleteIfExists(frame.toPath());
             }

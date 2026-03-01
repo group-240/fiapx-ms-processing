@@ -10,4 +10,6 @@ public interface CapturaRepository {
     String upload(File file, String path);
     void updateStatus(Integer idTransacao, com.fiap.fiapx.domain.entities.CapturaStatus status);
     void sendErrorEmail(String to, Integer videoId);
+    List<String> listFiles(String prefix);
+    byte[] downloadFile(String key);
 }

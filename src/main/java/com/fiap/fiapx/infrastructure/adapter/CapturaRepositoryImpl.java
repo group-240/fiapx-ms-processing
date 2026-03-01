@@ -44,4 +44,14 @@ public class CapturaRepositoryImpl implements CapturaRepository {
     public void sendErrorEmail(String to, Integer videoId) {
         emailAdapter.sendErrorEmail(to, videoId);
     }
+
+    @Override
+    public List<String> listFiles(String prefix) {
+        return s3Storage.listFiles(prefix);
+    }
+
+    @Override
+    public byte[] downloadFile(String key) {
+        return s3Storage.downloadFile(key);
+    }
 }

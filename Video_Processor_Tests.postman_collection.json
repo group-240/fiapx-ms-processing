@@ -34,14 +34,8 @@
 				},
 				"url": {
 					"raw": "{{base_url}}/api/capturas/upload",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"capturas",
-						"upload"
-					]
+					"host": ["{{base_url}}"],
+					"path": ["api", "capturas", "upload"]
 				},
 				"description": "Envia um vídeo para processamento assíncrono com id (integer) e email."
 			},
@@ -63,16 +57,29 @@
 				},
 				"url": {
 					"raw": "{{base_url}}/api/capturas/update-status",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"api",
-						"capturas",
-						"update-status"
-					]
+					"host": ["{{base_url}}"],
+					"path": ["api", "capturas", "update-status"]
 				},
 				"description": "Atualiza o status da captura para CONCLUIDO, PROCESSANDO ou ERRO."
+			},
+			"response": []
+		},
+		{
+			"name": "Download Capturas (ZIP)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/zip"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/capturas/download/3214",
+					"host": ["{{base_url}}"],
+					"path": ["api", "capturas", "download", "3214"]
+				},
+				"description": "Realiza o download do arquivo ZIP contendo as capturas geradas para o id informado."
 			},
 			"response": []
 		},
@@ -83,13 +90,8 @@
 				"header": [],
 				"url": {
 					"raw": "{{base_url}}/swagger-ui/index.html",
-					"host": [
-						"{{base_url}}"
-					],
-					"path": [
-						"swagger-ui",
-						"index.html"
-					]
+					"host": ["{{base_url}}"],
+					"path": ["swagger-ui", "index.html"]
 				},
 				"description": "Acessa a interface visual do Swagger."
 			},

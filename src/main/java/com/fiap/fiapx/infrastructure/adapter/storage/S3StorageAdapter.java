@@ -4,11 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.File;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -33,6 +36,38 @@ public class S3StorageAdapter {
             return "s3://" + bucketName + "/" + path;
         } catch (Exception e) {
             log.error("Erro ao fazer upload para o S3: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public List<String> listFiles(String prefix) {
+        log.info("Listando arquivos no bucket {} com prefixo {}", bucketName, prefix);
+        try {
+            ListObjectsV2Request listRequest = ListObjectsV2Request.builder()
+                    .bucket(bucketName)
+                    .prefix(prefix)
+                    .build();
+            ListObjectsV2Response response = s3Client.listObjectsV2(listRequest);
+            return response.contents().stream()
+                    .map(S3Object::key)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao listar arquivos no S3: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    public byte[] downloadFile(String key) {
+        log.info("Baixando arquivo {} do bucket {}", key, bucketName);
+        try {
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(key)
+                    .build();
+            ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(getRequest);
+            return objectBytes.asByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao baixar arquivo do S3: {}", e.getMessage());
             return null;
         }
     }
