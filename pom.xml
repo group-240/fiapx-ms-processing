@@ -55,11 +55,20 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-	</dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
+                <!-- AWS SDK v2 — SQS -->
+                <dependency>
+                        <groupId>software.amazon.awssdk</groupId>
+                        <artifactId>sqs</artifactId>
+                        <version>2.25.40</version>
+                </dependency>
+
+                <!-- Micrometer Prometheus registry -->
+                <dependency>
+                        <groupId>io.micrometer</groupId>
+                        <artifactId>micrometer-registry-prometheus</artifactId>
+                </dependency>
+
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>

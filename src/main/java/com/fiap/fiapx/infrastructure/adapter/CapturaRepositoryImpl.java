@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 @Repository
@@ -30,8 +32,6 @@ public class CapturaRepositoryImpl implements CapturaRepository {
 
     @Override
     public String upload(File file, String path) {
-        // Salva em ambos para validação
-        //localStorage.upload(file, path);
         return s3Storage.upload(file, path);
     }
 
@@ -53,5 +53,20 @@ public class CapturaRepositoryImpl implements CapturaRepository {
     @Override
     public byte[] downloadFile(String key) {
         return s3Storage.downloadFile(key);
+    }
+
+    @Override
+    public File downloadFromS3(String s3Key) {
+        byte[] content = s3Storage.downloadFile(s3Key);
+        try {
+            String extension = s3Key.contains(".") ? s3Key.substring(s3Key.lastIndexOf(".")) : ".mp4";
+            File tempFile = File.createTempFile("video_download_", extension);
+            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                fos.write(content);
+            }
+            return tempFile;
+        } catch (IOException e) {
+            throw new RuntimeException("Falha ao salvar vídeo baixado do S3: " + e.getMessage(), e);
+        }
     }
 }
