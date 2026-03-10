@@ -7,9 +7,8 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
   ECR_REPOSITORY: fiapx-ms-processing
-  EKS_CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+  EKS_CLUSTER_NAME: fiapx-cluster
   DEPLOYMENT_NAME: fiapx-ms-processing
 
 jobs:
@@ -36,6 +35,12 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve AWS account and ECR registry
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" >> $GITHUB_ENV
 
       - name: Login to Amazon ECR
         id: login-ecr
