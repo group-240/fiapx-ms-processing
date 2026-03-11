@@ -27,7 +27,7 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn package -DskipTests --batch-mode
+        run: mvn package -Dmaven.test.skip=true --batch-mode
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
