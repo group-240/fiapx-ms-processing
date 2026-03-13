@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fiapx-ms-processing
+  namespace: fiapx
+  labels:
+    app: fiapx-ms-processing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fiapx-ms-processing
+  template:
+    metadata:
+      labels:
+        app: fiapx-ms-processing
+    spec:
+      serviceAccountName: fiapx-sa
+      containers:
+        - name: fiapx-ms-processing
+          image: PLACEHOLDER_ECR_URL/fiapx-ms-processing:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: fiapx-secrets
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fiapx-ms-processing-hpa
+  namespace: fiapx
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fiapx-ms-processing
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

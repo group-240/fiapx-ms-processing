@@ -1,134 +1,109 @@
-# FIAPX - Video Processor Service (Tech Challenge)
+# FIAPX Video Processor (`fiapx-ms-processing`)
 
-[![Java Version](https://img.shields.io/badge/Java-17-blue.svg)](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
-
-Este microsserviço é o motor de processamento de mídia do ecossistema **FIAPX**. Ele foi projetado para extrair frames de vídeos de forma escalável, utilizando processamento assíncrono e armazenamento em nuvem (AWS S3), com notificações de status em tempo real para sistemas externos.
+Microsserviço worker responsável por consumir mensagens de processamento de vídeo, baixar o arquivo do S3, extrair frames com FFmpeg/JavaCV e atualizar o status na API principal (`fiapx`).
 
 ---
 
-## 🏗️ Arquitetura do Sistema
+## Responsabilidade no sistema
 
-O projeto adota a **Clean Architecture** (Arquitetura Limpa), com a estrutura de pacotes organizada conforme o padrão solicitado:
+- Consumir eventos de processamento no RabbitMQ
+- Processar vídeo (extração de frames)
+- Armazenar frames no S3
+- Notificar status da transação (`PROCESSANDO`, `CONCLUIDO`, `ERRO`)
+- Expor health/prometheus para monitoramento
 
-### Estrutura de Pastas
+> Em produção no EKS ele funciona como **worker interno** (sem Service público).
+
+---
+
+## Arquitetura (Clean Architecture)
 
 ```text
 src/main/java/com/fiap/fiapx/
-├── domain/                      # Camada de Domínio (Regras de Negócio)
-│   ├── entities/                # Entidades de domínio (Captura, CapturaStatus)
-│   ├── repositories/            # Interfaces de repositório e gateways
-│   └── exception/               # Exceções customizadas
-├── application/                 # Camada de Aplicação (Casos de Uso)
-│   ├── usecases/                # Implementação dos Casos de Uso (UploadCapturaUseCase)
-│   └── dto/                     # Objetos de Transferência de Dados
-├── infrastructure/              # Camada de Infraestrutura (Adaptadores)
-│   ├── adapter/                 # Implementações de Repositórios e Clientes
-│   └── configuration/           # Configurações do Spring e OpenAPI
-└── presentation/                # Camada de Apresentação (Controladores)
-    └── controller/              # Endpoints REST
+├── domain/            -> Entidades/regras de negócio
+├── application/       -> Casos de uso de processamento
+├── infrastructure/    -> RabbitMQ, S3, FFmpeg, notificações
+├── presentation/      -> Controller (uso local/dev)
+└── configuration/     -> Beans/configurações Spring
 ```
 
----
+### Componentes chave
 
-## 🧩 Explicação das Classes Principais
-
-| Classe | Responsabilidade | Camada |
-| :--- | :--- | :--- |
-| `VideoController` | Recebe `idTransacao`, `email` e `MultipartFile`. Inicia o processamento assíncrono. | Presentation |
-| `UploadCapturaUseCase` | Gerencia o ciclo de vida do processamento (Status: PROCESSING -> DONE/ERROR). | Application |
-| `Captura` | Entidade de domínio que representa o vídeo e seus metadados. | Domain |
-| `CapturaRepositoryImpl` | Orquestra o uso de processadores de vídeo, storages e notificações. | Infrastructure |
-| `FFmpegVideoProcessor` | Utiliza **JavaCV** para extrair frames sem dependências do SO. | Infrastructure |
-| `S3StorageAdapter` | Realiza o upload dos frames para o bucket AWS S3. | Infrastructure |
-| `EmailNotificationAdapter` | Envia e-mails de alerta em caso de falha no processamento. | Infrastructure |
+- `RabbitMQConsumer`: consome mensagens da fila
+- `UploadCapturaUseCase`: orquestra processamento e status
+- `FFmpegVideoProcessor`: extrai frames do vídeo
+- `S3StorageAdapter`: baixa vídeo e publica frames
+- `HttpNotificationAdapter`: chama API principal para atualizar status
 
 ---
 
-## 🚀 Escalabilidade e Performance
+## Fluxo interno do worker
 
-- **Non-blocking I/O**: Uso de `CompletableFuture` para processamento paralelo.
-- **Stateless Design**: Permite escalonamento horizontal em clusters.
-- **Pure Java**: Independência de binários externos do sistema operacional.
+1. Recebe mensagem com `id`, `userId`, `email`, `s3Key`
+2. Atualiza status para `PROCESSANDO`
+3. Faz download do vídeo no S3
+4. Extrai frames com FFmpeg/JavaCV
+5. Faz upload dos frames para o S3
+6. Atualiza status para `CONCLUIDO`
+
+Em caso de falha:
+- atualiza status para `ERRO`
+- registra erro para diagnóstico
 
 ---
 
-## 🧪 Testes e Qualidade
+## Configuração por variáveis de ambiente
 
-### Cobertura com JaCoCo
-Para gerar o relatório de cobertura:
+| Variável | Uso |
+|---|---|
+| `S3_BUCKET`, `AWS_REGION` | acesso ao bucket de vídeos/frames |
+| `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | consumo de fila |
+| `RABBITMQ_QUEUE`, `RABBITMQ_EXCHANGE`, `RABBITMQ_ROUTING_KEY` | binding/routing |
+| `NOTIFICATION_URL` | endpoint HTTP de update de status |
+| `SPLITTER_INTERVAL_SECONDS` | intervalo de extração de frames |
+
+Actuator/Prometheus:
+- `/actuator/health`
+- `/actuator/prometheus`
+
+---
+
+## Runtime container
+
+O container usa base Debian (`jammy`) e instala libs nativas necessárias para JavaCV/FFmpeg.
+
+Isso resolve o erro clássico:
+- `UnsatisfiedLinkError: no jniavutil in java.library.path`
+
+---
+
+## Build e execução
+
+### Local (build)
+
 ```bash
-mvn clean test
+mvn clean package
 ```
-O relatório estará disponível em: `target/site/jacoco/index.html`
 
----
+### Docker
 
-## 📖 Guia de Integração (API)
-
-### 1. Upload de Vídeo
-Envia um arquivo de vídeo para processamento.
-
-**Endpoint:** `POST /api/capturas/upload`  
-**Content-Type:** `multipart/form-data`
-
-**Parâmetros de Query:**
-- `idTransacao`: ID da transação (ex: 1)
-- `email`: Email para contato (ex: user@fiap.com.br)
-
-**Exemplo cURL:**
 ```bash
-curl -X POST "http://localhost:8080/api/capturas/upload?id=1&email=user@fiap.com.br" \
-  -F "file=@video.mp4;type=video/mp4"
-```
-
-### 2. Notificação de Status (Saída)
-O serviço enviará chamadas **PUT** para o sistema externo configurado:
-**Endpoint:** `{notification.endpoint.url}/{idTransacao}`  
-**Payload:**
-```json
-{
-  "status": "PROCESSANDO"
-}
-```
-
-### 3. Notificação por E-mail (Erro)
-Em caso de falha, um e-mail será enviado ao usuário:
-- **Assunto:** Erro ao processar o video {videoId}
-- **Corpo:** Seu video foi interrompido por algum erro
-
-### 4. Download de Frames (ZIP)
-Baixa todos os frames processados de uma transação específica.
-
-**Endpoint:** `GET /api/capturas/download/{idTransacao}`  
-**Exemplo cURL:**
-```bash
-curl -X GET "http://localhost:8080/api/capturas/download/1" --output frames.zip
+docker build -t fiapx-ms-processing:local .
+docker run --rm -p 8080:8080 fiapx-ms-processing:local
 ```
 
 ---
 
-## ⚙️ Configuração (application.properties)
+## CI/CD
 
-```properties
-# AWS S3
-aws.s3.bucket=fiapx-videos-bucket
+Workflow: `.github/workflows/ci.yml`
 
-# Notificações
-notification.endpoint.url=http://api-externa:8888/api/capturas/update-status
+- Build Maven (testes skip no pipeline)
+- Build/push imagem ECR
+- Apply deployment no EKS
+- Rollout status
 
-# E-mail (SMTP)
-spring.mail.host=smtp.exemplo.com
-spring.mail.port=587
-spring.mail.username=seu-usuario
-spring.mail.password=sua-senha
-spring.mail.properties.mail.smtp.auth=true
-spring.mail.properties.mail.smtp.starttls.enable=true
+Branches com gatilho automático:
+- `fix`
+- `main`
 
-# Storage Local (Validação)
-storage.local.path=./capturas-validacao
-```
-
----
-**Grupo 240 - FIAPX**  
-*Tech Challenge - Fase 4*
