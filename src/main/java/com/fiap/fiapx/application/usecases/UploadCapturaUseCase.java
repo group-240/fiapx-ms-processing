@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -70,16 +71,26 @@ public class UploadCapturaUseCase {
 
             long uploadStartTime = System.currentTimeMillis();
             log.info("Iniciando upload de {} frames para S3: idTransacao={}", frames.size(), idTransacao);
+            int successfulUploads = 0;
+            List<String> failedFrames = new ArrayList<>();
+            
             for (int i = 0; i < frames.size(); i++) {
                 File frame = frames.get(i);
                 String path = "transacao_" + idTransacao + "/frame_" + (i * secundSplitter) + "s.jpg";
                 
                 long frameUploadStart = System.currentTimeMillis();
-                repository.upload(frame, path);
-                long frameUploadDuration = System.currentTimeMillis() - frameUploadStart;
-                
-                log.debug("Frame enviado para S3: idTransacao={}, frameIndex={}, s3Path={}, sizeMB={}, duration={}ms", 
-                        idTransacao, i, path, frame.length() / (1024.0 * 1024.0), frameUploadDuration);
+                try {
+                    repository.upload(frame, path);
+                    successfulUploads++;
+                    long frameUploadDuration = System.currentTimeMillis() - frameUploadStart;
+                    log.debug("Frame enviado para S3: idTransacao={}, frameIndex={}, s3Path={}, sizeMB={}, duration={}ms", 
+                            idTransacao, i, path, frame.length() / (1024.0 * 1024.0), frameUploadDuration);
+                } catch (Exception e) {
+                    long frameUploadDuration = System.currentTimeMillis() - frameUploadStart;
+                    log.error("Falha no upload do frame para S3: idTransacao={}, frameIndex={}, s3Path={}, duration={}ms, erro={}", 
+                            idTransacao, i, path, frameUploadDuration, e.getMessage());
+                    failedFrames.add(path);
+                }
                 
                 try {
                     Files.deleteIfExists(frame.toPath());
@@ -88,9 +99,18 @@ public class UploadCapturaUseCase {
                     log.warn("Falha ao deletar frame temporário: idTransacao={}, file={}, erro={}", idTransacao, frame.getAbsolutePath(), e.getMessage());
                 }
             }
+            
             long uploadDuration = System.currentTimeMillis() - uploadStartTime;
-            log.info("Todos os frames enviados para S3: idTransacao={}, totalFrames={}, duration={}ms", 
-                    idTransacao, frames.size(), uploadDuration);
+            log.info("Upload de frames concluído: idTransacao={}, totalFrames={}, sucessos={}, falhas={}, duration={}ms", 
+                    idTransacao, frames.size(), successfulUploads, failedFrames.size(), uploadDuration);
+            
+            // Validação: não marcar como CONCLUIDO se houver falhas
+            if (successfulUploads < frames.size()) {
+                String errorMsg = String.format("Falha crítica: apenas %d de %d frames foram enviados para S3 (falhas: %s). Processamento interrompido.",
+                        successfulUploads, frames.size(), failedFrames);
+                log.error("===== PROCESSAMENTO FALHOU ===== idTransacao={}, {}", idTransacao, errorMsg);
+                throw new RuntimeException(errorMsg);
+            }
 
             long finalStatusStartTime = System.currentTimeMillis();
             repository.updateStatus(idTransacao, CapturaStatus.CONCLUIDO);

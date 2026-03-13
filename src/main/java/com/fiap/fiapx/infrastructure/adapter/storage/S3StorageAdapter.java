@@ -23,7 +23,7 @@ public class S3StorageAdapter {
     @Value("${aws.s3.bucket}")
     private String bucketName;
 
-    public String upload(File file, String path) {
+    public String upload(File file, String path) throws Exception {
         log.info("Fazendo upload para o S3: {}/{}", bucketName, path);
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
@@ -35,8 +35,8 @@ public class S3StorageAdapter {
             s3Client.putObject(putObjectRequest, RequestBody.fromFile(file));
             return "s3://" + bucketName + "/" + path;
         } catch (Exception e) {
-            log.error("Erro ao fazer upload para o S3: {}", e.getMessage());
-            return null;
+            log.error("Erro ao fazer upload para o S3: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao fazer upload do arquivo para S3: " + path, e);
         }
     }
 
