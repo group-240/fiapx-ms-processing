@@ -10,6 +10,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.util.Base64;
@@ -29,14 +30,7 @@ public class VideoProcessingListener {
                 message.getId(), message.getEmail());
 
         try {
-            byte[] videoBytes = decodeVideo(message.getVideo());
-
-            Captura captura = Captura.builder()
-                    .id(message.getId())
-                    .email(message.getEmail())
-                    .fileName("video_" + message.getId() + ".mp4")
-                    .content(videoBytes)
-                    .build();
+            Captura captura = toCaptura(message);
 
             uploadCapturaUseCase.execute(captura);
 
@@ -49,6 +43,32 @@ public class VideoProcessingListener {
         }
     }
 
+    private Captura toCaptura(VideoProcessingMessage message) {
+        if (StringUtils.hasText(message.getS3Key())) {
+            String s3Key = message.getS3Key();
+
+            return Captura.builder()
+                    .id(message.getId())
+                    .email(message.getEmail())
+                    .fileName(extractFileName(s3Key))
+                    .s3Key(s3Key)
+                    .build();
+        }
+
+        if (StringUtils.hasText(message.getVideo())) {
+            byte[] videoBytes = decodeVideo(message.getVideo());
+
+            return Captura.builder()
+                    .id(message.getId())
+                    .email(message.getEmail())
+                    .fileName("video_" + message.getId() + ".mp4")
+                    .content(videoBytes)
+                    .build();
+        }
+
+        throw new IllegalArgumentException("Mensagem não possui vídeo inline nem s3Key para processamento");
+    }
+
     private byte[] decodeVideo(String videoDataUri) {
         String base64Data = videoDataUri;
         int commaIndex = videoDataUri.indexOf(',');
@@ -56,5 +76,10 @@ public class VideoProcessingListener {
             base64Data = videoDataUri.substring(commaIndex + 1);
         }
         return Base64.getDecoder().decode(base64Data);
+    }
+
+    private String extractFileName(String s3Key) {
+        int lastSlash = s3Key.lastIndexOf('/');
+        return lastSlash >= 0 ? s3Key.substring(lastSlash + 1) : s3Key;
     }
 }

@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class VideoProcessingMessage {
     private Integer id;
+    private Long userId;
     private String email;
     private String video;
+    private String s3Key;
 }

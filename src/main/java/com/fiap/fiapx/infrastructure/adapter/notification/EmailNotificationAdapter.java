@@ -3,7 +3,6 @@ package com.fiap.fiapx.infrastructure.adapter.notification;
 import com.fiap.fiapx.domain.repositories.EmailGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.util.StringUtils;
@@ -13,14 +12,17 @@ import org.springframework.util.StringUtils;
 public class EmailNotificationAdapter implements EmailGateway {
 
     private final JavaMailSender mailSender;
-
-    @Value("${mail.from}")
-    private String from;
+    private final String from;
 
     @Override
     public void sendErrorEmail(String to, Integer videoId) {
         if (!StringUtils.hasText(to)) {
             log.warn("E-mail de destino não informado. videoId={}", videoId);
+            return;
+        }
+
+        if (!StringUtils.hasText(from)) {
+            log.warn("Remetente de e-mail não configurado. videoId={} destino={}", videoId, to);
             return;
         }
 

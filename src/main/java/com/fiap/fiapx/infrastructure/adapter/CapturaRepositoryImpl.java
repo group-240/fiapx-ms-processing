@@ -2,6 +2,7 @@ package com.fiap.fiapx.infrastructure.adapter;
 
 import com.fiap.fiapx.domain.entities.CapturaStatus;
 import com.fiap.fiapx.domain.repositories.CapturaRepository;
+import com.fiap.fiapx.domain.repositories.EmailGateway;
 import com.fiap.fiapx.infrastructure.adapter.notification.HttpNotificationAdapter;
 import com.fiap.fiapx.infrastructure.adapter.storage.LocalStorageAdapter;
 import com.fiap.fiapx.infrastructure.adapter.storage.S3StorageAdapter;
@@ -24,6 +25,7 @@ public class CapturaRepositoryImpl implements CapturaRepository {
     private final S3StorageAdapter s3Storage;
     private final LocalStorageAdapter localStorage;
     private final HttpNotificationAdapter notificationAdapter;
+    private final EmailGateway emailGateway;
 
     @Override
     public List<File> extractFrames(File videoFile, int intervalSeconds) {
@@ -42,7 +44,7 @@ public class CapturaRepositoryImpl implements CapturaRepository {
 
     @Override
     public void sendErrorEmail(String to, Integer videoId) {
-        log.warn("Notificação por e-mail desabilitada. videoId={} destino={}", videoId, to);
+        emailGateway.sendErrorEmail(to, videoId);
     }
 
     @Override
