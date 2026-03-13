@@ -27,17 +27,28 @@ public class UploadCapturaUseCase {
     public void execute(Captura captura) {
         Integer idTransacao = captura.getId();
         File tempVideoFile = null;
+        long processStartTime = System.currentTimeMillis();
 
         try {
-            log.info("Iniciando processamento — transacao={} email={}", idTransacao, captura.getEmail());
+            log.info("===== INICIO PROCESSAMENTO ===== idTransacao={}, email={}, fileName={}", 
+                    idTransacao, captura.getEmail(), captura.getFileName());
 
+            long statusStartTime = System.currentTimeMillis();
             repository.updateStatus(idTransacao, CapturaStatus.PROCESSANDO);
+            long statusDuration = System.currentTimeMillis() - statusStartTime;
+            log.debug("Status atualizado para PROCESSANDO: idTransacao={}, duration={}ms", idTransacao, statusDuration);
 
             // Obter o arquivo de vídeo: via s3Key (fluxo SQS) ou conteúdo em memória (fluxo direto)
+            long downloadStartTime = System.currentTimeMillis();
             if (captura.getS3Key() != null && !captura.getS3Key().isBlank()) {
-                log.info("Baixando vídeo do S3 — s3Key={}", captura.getS3Key());
+                log.info("Baixando vídeo do S3: idTransacao={}, s3Key={}", idTransacao, captura.getS3Key());
                 tempVideoFile = repository.downloadFromS3(captura.getS3Key());
+                long downloadDuration = System.currentTimeMillis() - downloadStartTime;
+                log.info("Vídeo baixado do S3 com sucesso: idTransacao={}, tempFile={}, sizeMB={}, duration={}ms", 
+                        idTransacao, tempVideoFile.getAbsolutePath(), tempVideoFile.length() / (1024 * 1024), downloadDuration);
             } else {
+                log.info("Criando arquivo temporário com conteúdo em memória: idTransacao={}, sizeMB={}", 
+                        idTransacao, captura.getContent().length / (1024 * 1024));
                 String extension = captura.getFileName() != null && captura.getFileName().contains(".")
                         ? captura.getFileName().substring(captura.getFileName().lastIndexOf("."))
                         : ".mp4";
@@ -45,30 +56,73 @@ public class UploadCapturaUseCase {
                 try (FileOutputStream fos = new FileOutputStream(tempVideoFile)) {
                     fos.write(captura.getContent());
                 }
+                long writeDuration = System.currentTimeMillis() - downloadStartTime;
+                log.info("Arquivo temporário criado: idTransacao={}, tempFile={}, sizeMB={}, duration={}ms", 
+                        idTransacao, tempVideoFile.getAbsolutePath(), tempVideoFile.length() / (1024 * 1024), writeDuration);
             }
 
+            long extractStartTime = System.currentTimeMillis();
+            log.info("Iniciando extração de frames: idTransacao={}, intervaloSegundos={}", idTransacao, secundSplitter);
             List<File> frames = repository.extractFrames(tempVideoFile, secundSplitter);
+            long extractDuration = System.currentTimeMillis() - extractStartTime;
+            log.info("Frames extraídos com sucesso: idTransacao={}, totalFrames={}, duration={}ms", 
+                    idTransacao, frames.size(), extractDuration);
 
+            long uploadStartTime = System.currentTimeMillis();
+            log.info("Iniciando upload de {} frames para S3: idTransacao={}", frames.size(), idTransacao);
             for (int i = 0; i < frames.size(); i++) {
                 File frame = frames.get(i);
                 String path = "transacao_" + idTransacao + "/frame_" + (i * secundSplitter) + "s.jpg";
+                
+                long frameUploadStart = System.currentTimeMillis();
                 repository.upload(frame, path);
-                Files.deleteIfExists(frame.toPath());
+                long frameUploadDuration = System.currentTimeMillis() - frameUploadStart;
+                
+                log.debug("Frame enviado para S3: idTransacao={}, frameIndex={}, s3Path={}, sizeMB={}, duration={}ms", 
+                        idTransacao, i, path, frame.length() / (1024.0 * 1024.0), frameUploadDuration);
+                
+                try {
+                    Files.deleteIfExists(frame.toPath());
+                    log.debug("Frame temporário deletado: idTransacao={}, file={}", idTransacao, frame.getAbsolutePath());
+                } catch (IOException e) {
+                    log.warn("Falha ao deletar frame temporário: idTransacao={}, file={}, erro={}", idTransacao, frame.getAbsolutePath(), e.getMessage());
+                }
             }
+            long uploadDuration = System.currentTimeMillis() - uploadStartTime;
+            log.info("Todos os frames enviados para S3: idTransacao={}, totalFrames={}, duration={}ms", 
+                    idTransacao, frames.size(), uploadDuration);
 
+            long finalStatusStartTime = System.currentTimeMillis();
             repository.updateStatus(idTransacao, CapturaStatus.CONCLUIDO);
-            log.info("Processamento finalizado — transacao={}", idTransacao);
+            long finalStatusDuration = System.currentTimeMillis() - finalStatusStartTime;
+            log.debug("Status atualizado para CONCLUIDO: idTransacao={}, duration={}ms", idTransacao, finalStatusDuration);
+
+            long totalProcessDuration = System.currentTimeMillis() - processStartTime;
+            log.info("===== PROCESSAMENTO CONCLUIDO ===== idTransacao={}, email={}, totalFrames={}, totalDuration={}ms", 
+                    idTransacao, captura.getEmail(), frames.size(), totalProcessDuration);
 
         } catch (Exception e) {
-            log.error("Erro ao processar vídeo — transacao={}: {}", idTransacao, e.getMessage());
-            repository.updateStatus(idTransacao, CapturaStatus.ERRO);
-            repository.sendErrorEmail(captura.getEmail(), captura.getId());
+            long errorDuration = System.currentTimeMillis() - processStartTime;
+            log.error("===== ERRO NO PROCESSAMENTO ===== idTransacao={}, email={}, duration={}ms, erro={}", 
+                    idTransacao, captura.getEmail(), errorDuration, e.getMessage(), e);
+            
+            try {
+                log.info("Atualizando status para ERRO e enviando notificação por email: idTransacao={}", idTransacao);
+                repository.updateStatus(idTransacao, CapturaStatus.ERRO);
+                repository.sendErrorEmail(captura.getEmail(), captura.getId());
+                log.info("Notificação de erro enviada: idTransacao={}, email={}", idTransacao, captura.getEmail());
+            } catch (Exception emailException) {
+                log.error("Erro ao enviar email de notificação: idTransacao={}, email={}, erro={}", 
+                        idTransacao, captura.getEmail(), emailException.getMessage(), emailException);
+            }
         } finally {
             if (tempVideoFile != null) {
                 try {
+                    log.debug("Deletando arquivo temporário de vídeo: file={}", tempVideoFile.getAbsolutePath());
                     Files.deleteIfExists(tempVideoFile.toPath());
+                    log.debug("Arquivo temporário deletado com sucesso");
                 } catch (IOException e) {
-                    log.warn("Não foi possível deletar arquivo temporário: {}", tempVideoFile.getAbsolutePath());
+                    log.warn("Não foi possível deletar arquivo temporário: file={}, erro={}", tempVideoFile.getAbsolutePath(), e.getMessage());
                 }
             }
         }
