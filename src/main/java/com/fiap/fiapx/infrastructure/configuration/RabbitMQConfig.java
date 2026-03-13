@@ -23,10 +23,7 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue videoProcessingQueue() {
-        return QueueBuilder.durable(queueName)
-                .withArgument("x-dead-letter-exchange", exchangeName + ".dlx")
-                .withArgument("x-dead-letter-routing-key", routingKey + ".dlq")
-                .build();
+        return QueueBuilder.durable(queueName).build();
     }
 
     @Bean
@@ -39,23 +36,6 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(videoProcessingQueue)
                 .to(videoProcessingExchange)
                 .with(routingKey);
-    }
-
-    @Bean
-    public Queue deadLetterQueue() {
-        return QueueBuilder.durable(queueName + ".dlq").build();
-    }
-
-    @Bean
-    public DirectExchange deadLetterExchange() {
-        return new DirectExchange(exchangeName + ".dlx");
-    }
-
-    @Bean
-    public Binding deadLetterBinding(Queue deadLetterQueue, DirectExchange deadLetterExchange) {
-        return BindingBuilder.bind(deadLetterQueue)
-                .to(deadLetterExchange)
-                .with(routingKey + ".dlq");
     }
 
     @Bean
