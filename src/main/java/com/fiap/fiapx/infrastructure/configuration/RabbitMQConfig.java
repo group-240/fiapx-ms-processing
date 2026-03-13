@@ -30,12 +30,12 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public DirectExchange videoProcessingExchange() {
-        return new DirectExchange(exchangeName);
+    public TopicExchange videoProcessingExchange() {
+        return new TopicExchange(exchangeName);
     }
 
     @Bean
-    public Binding videoProcessingBinding(Queue videoProcessingQueue, DirectExchange videoProcessingExchange) {
+    public Binding videoProcessingBinding(Queue videoProcessingQueue, TopicExchange videoProcessingExchange) {
         return BindingBuilder.bind(videoProcessingQueue)
                 .to(videoProcessingExchange)
                 .with(routingKey);
