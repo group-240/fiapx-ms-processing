@@ -15,7 +15,7 @@ spec:
       labels:
         app: fiapx-ms-processing
     spec:
-      serviceAccountName: fiapx-sa
+      serviceAccountName: fiapx-processing-sa
       containers:
         - name: fiapx-ms-processing
           image: PLACEHOLDER_ECR_URL/fiapx-ms-processing:latest
