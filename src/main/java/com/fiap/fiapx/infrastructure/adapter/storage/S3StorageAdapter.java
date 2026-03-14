@@ -23,7 +23,7 @@ public class S3StorageAdapter {
     @Value("${aws.s3.bucket}")
     private String bucketName;
 
-    public String upload(File file, String path) throws Exception {
+    public String upload(File file, String path) {
         log.info("Fazendo upload para o S3: {}/{}", bucketName, path);
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
